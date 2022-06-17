@@ -11,6 +11,9 @@ library(fresh)
 library(fontawesome)
 library(lubridate)
 library(anytime)
+library(showtext)
+library(sysfonts)
+library(showtextdb)
 
 # Carga de csv_________________________________________________________________
 data <- read_csv("./data.csv", 
@@ -21,7 +24,7 @@ explicaciones <- read_excel("explicaciones.xlsx")
 factores <- read_excel("variables_factores.xlsx")
 factores2 <- factores %>% 
   mutate(breaks_2 = lapply(strsplit(breaks, ','), FUN = as.numeric),
-         ESP = strsplit(labels_ESP,","),
+         CAM = strsplit(labels_CAM,","),
          ENG = strsplit(labels_ENG,","),
          paleta = strsplit(paleta_colores,","))
 
@@ -32,23 +35,38 @@ if (file.exists("coords.csv")){
 }
 #______________________________________________________________________________
 
+# Variables globales___________________________________________________________
+
+## Umbral del CO2 para considerar que se queman residuos
+
+umbral <- 700
+
+## Número de datos que conforman una hora. Ahora, sampleo cada 15 mins:
+
+n_barras <- 4
+
+
+# Cargando fuentes de  Google (https://fonts.google.com/)
+#font_add_google("Hanuman", "hanuman")
+
+#______________________________________________________________________________
 
 ui <- navbarPage(
   theme = shinytheme("united"),
+  #Para probar otros estilos
   #shinythemes::themeSelector(),
   
-  #title = div(img(src="./logo.png"), "Calidad del Aire: Camboya"),
+  
   title = div(div(id = "img-id",
       img(src = "logo.png",
           width= "90px", 
           height="40px")
     ),
-    "Calidad del Aire: Camboya"
+    "Cambodia"
   ),
   
+  #Estilos_____________________________________________________________________
   
-  
-
   #Estilo InfoBoxes
   header = tagList(
     useShinydashboard()
@@ -58,14 +76,15 @@ ui <- navbarPage(
                             .info-box-content {padding-top: 0px; padding-bottom: 0px;}'))),
   
   #Estilo para el texto
-  tags$head(tags$style("#explicacion{color: black;
+  tags$head(tags$style(HTML("#explicacion{color: black;
                                  font-size: 25px;
-                                 font-family: Khmer;
+                                 font-family: Arial;
                                  }"
-    )),
+    ))),
  
+  tags$head(tags$style(HTML('* {font-family: "Arial"};'))),
   
-  #Estilo para el logo_________________________________________________________
+  #Estilo para el logo
   tags$head(tags$style(
     type="text/css",
     "#img-id{
@@ -75,9 +94,8 @@ ui <- navbarPage(
     top: 5px;
     }"
   )),
- #_____________________________________________________________________________
  
- # Estilo del cuadro de diálogo________________________________________________
+ # Estilo del cuadro de diálogo
   use_theme(
     create_theme(
       theme = "united",
@@ -96,14 +114,14 @@ ui <- navbarPage(
 #Panel Lateral_________________________________________________________________
   sidebarLayout(
     sidebarPanel(
-      #Mapa de las fresas
+      #Mapa de los aparatos
       leafletOutput("mapa_interactivo", width = "100%"),
       br(),
       #Seleccion de idioma
       fluidRow(column(2, dropdownButton(
         selectInput("idioma","",
-                    c("ESP", "ENG", "CAM"),
-                    selected = "ESP"),
+                    c("ENG"), #, "CAM"
+                    selected = "ENG"),
         circle = TRUE, status = "danger",
         icon = icon("gear"), width = "300px"
       )),
@@ -153,27 +171,28 @@ server <- function(input, output, session) {
   output$main_plot <- renderPlot({
     
     #Validacion de inputs
-    if (input$idioma == "ESP"){
+    if (input$idioma == "CAM"){
       validate(
-        need(input$id, "Lo sentimos, pero no has seleccionado ningún dispositivo. 
-                      Por favor, seleccione al menos uno."
+        need(input$id, "សូមអភ័យទោស ប៉ុន្តែអ្នកមិនបានជ្រើសរើសឧបករណ៍ណាមួយទេ។
+             សូមជ្រើសរើសយ៉ាងហោចណាស់មួយ។"
         )
       )
       
     } else if (input$idioma == "ENG"){
       validate(
-        need(input$dates, "Sorry, but you have not selected any device. 
+        need(input$id, "Sorry, but you have not selected any device. 
                       Please select at least one."
         )
       )
     }
     
-    if (input$idioma == "ESP"){
+    if (input$idioma == "CAM"){
       validate(
-        need(input$dates, "Lo sentimos, pero no has seleccionado ninguna fecha. 
-                      Por favor, seleccione dos fechas."
+        need(input$dates, "យើង·សុំទោស,ប៉ុន្តែអ្នកមិនបានជ្រើសរើសកាលបរិច្ឆេទណាមួយទេ។
+             សូមជ្រើសរើសកាលបរិច្ឆេទពីរ។"
         )
       )
+      lab_x = "កាលបរិច្ឆេទ"
       
     } else if (input$idioma == "ENG"){
       validate(
@@ -181,6 +200,7 @@ server <- function(input, output, session) {
                       Please add an input selection"
         )
       )
+      lab_x = "Date"
     }
     
     #Grafico
@@ -200,7 +220,7 @@ server <- function(input, output, session) {
       theme(legend.text = element_text(size=15, 
                                          face="bold")) +
       labs(
-        x = "Fecha",
+        x = lab_x,
         y = input$variable
       )
   })
@@ -211,17 +231,20 @@ server <- function(input, output, session) {
     
     output$boton_id_resumen <- renderUI({
       
-      if (input$idioma == "ESP"){
-          label = "Selecciona el aparato que quieras visualizar"
-         } else if (input$idioma == "ENG"){
+      if (input$idioma == "CAM"){
+          label = "ជ្រើសរើសឧបករណ៍ដែលអ្នកចង់មើល"
+          choices = c("ឧបករណ៍ 1" = "1","ឧបករណ៍ 2" = "2","ឧបករណ៍ 3" = "3",
+                      "ឧបករណ៍ 4" = "4","ឧបករណ៍ 5" = "5")
+          } else if (input$idioma == "ENG"){
             label = "Select the device you want to display"
+            choices = c("Aparato 1" = "1","Aparato 2" = "2","Aparato 3" = "3",
+                        "Aparato 4" = "4","Aparato 5" = "5")
           }
       
       checkboxGroupButtons(
         inputId = "id",
         label = label,
-        choices = c("Aparato 1" = "1","Aparato 2" = "2","Aparato 3" = "3",
-                    "Aparato 4" = "4","Aparato 5" = "5"),
+        choices = choices,
         selected = "1")
       
     })
@@ -235,6 +258,40 @@ server <- function(input, output, session) {
     #Volver a generar el plot principal
     
     output$main_plot <- renderPlot({
+      
+      if (input$idioma == "CAM"){
+        validate(
+          need(input$id, "សូមអភ័យទោស ប៉ុន្តែអ្នកមិនបានជ្រើសរើសឧបករណ៍ណាមួយទេ។
+             សូមជ្រើសរើសយ៉ាងហោចណាស់មួយ។"
+          )
+        )
+        
+      } else if (input$idioma == "ENG"){
+        validate(
+          need(input$id, "Sorry, but you have not selected any device. 
+                      Please select at least one."
+          )
+        )
+      }
+      
+      if (input$idioma == "CAM"){
+        validate(
+          need(input$dates, "យើង·សុំទោស,ប៉ុន្តែអ្នកមិនបានជ្រើសរើសកាលបរិច្ឆេទណាមួយទេ។
+             សូមជ្រើសរើសកាលបរិច្ឆេទពីរ។"
+          )
+        )
+        lab_x = "កាលបរិច្ឆេទ"
+        
+      } else if (input$idioma == "ENG"){
+        validate(
+          need(input$dates, "Sorry, but you have not selected any dates 
+                      Please select two dates."
+          ))
+        lab_x = "Date"
+      }
+      
+      
+      
       data %>%
         filter(
           Date >= as.POSIXct(input$dates[1]),
@@ -251,7 +308,7 @@ server <- function(input, output, session) {
         theme(legend.text = element_text(size=15, 
                                          face="bold")) +
         labs(
-          x = "Fecha",
+          x =lab_x,
           y = input$variable
         )
     })
@@ -260,8 +317,8 @@ server <- function(input, output, session) {
     
     output$InfoBoxes <- renderUI({
       
-      if(input$idioma == "ESP"){
-        titulos = c("Temperatura", "Humedad", "Batería")
+      if(input$idioma == "CAM"){
+        titulos = c("សីតុណ្ហភាព", "សំណើម", "ស្គរ")
       } else if(input$idioma == "ENG"){
         titulos = c("Temperature", "Humidity", "Battery")
       }
@@ -302,8 +359,8 @@ server <- function(input, output, session) {
     #Botón para volver al panel comparativo 
     output$boton_general <- renderUI({
       
-      if (input$idioma == "ESP"){
-          label = "Panel general"
+      if (input$idioma == "CAM"){
+          label = "ទិដ្ឋភាពទូទៅនៃផ្ទាំងគ្រប់គ្រង"
       } else if (input$idioma == "ENG"){
             label = "General panel"
             }
@@ -320,9 +377,9 @@ server <- function(input, output, session) {
     #Boton resumen para agrupar datos
     output$boton_id_resumen <- renderUI({
       
-      if (input$idioma == "ESP"){
-          label = "Selecciona el lapso temporal por el que quieres agrupar los datos:"
-          choices = c("Hora" = "h", "Diario" = "d", "Semanal" = "s", "Anual" = "a")
+      if (input$idioma == "CAM"){
+          label = "ជ្រើសរើសរយៈពេលដែលអ្នកចង់ដាក់ជាក្រុមទិន្នន័យ៖"
+          choices = c("ម៉ោង" = "h", "ប្រចាំថ្ងៃ" = "d", "ប្រចាំសប្តាហ៍" = "s", "ប្រចាំឆ្នាំ" = "a")
         } else if (input$idioma == "ENG"){
             label = "Select the time span you want to group the data by:"
             choices = c("Hour" = "h", "Diary" = "d", "Weekly" = "s", "Yearly" = "a")
@@ -341,10 +398,10 @@ server <- function(input, output, session) {
         
     output$main_plot <- renderPlot({
       
-      if (input$idioma == "ESP"){
+      if (input$idioma == "CAM"){
         validate(
-          need(input$dates, "Lo sentimos, pero no has seleccionado ninguna fecha. 
-                      Por favor, seleccione dos fechas."
+          need(input$dates, "យើងសុំទោស ប៉ុន្តែអ្នកមិនបានជ្រើសរើសកាលបរិច្ឆេទណាមួយទេ។
+               សូមជ្រើសរើសកាលបរិច្ឆេទពីរ។"
           )
         )
         
@@ -395,7 +452,7 @@ server <- function(input, output, session) {
         
      
     
-    #InfoBoxes_____________________________________
+    #InfoBoxes
       values <- data %>%
         filter(
           Date >= as.POSIXct(input$dates[1]),
@@ -440,8 +497,8 @@ server <- function(input, output, session) {
       output$temperatura<- renderInfoBox({
         
         
-        if (input$idioma == "ESP"){
-          titulo = c("Temperatura")
+        if (input$idioma == "CAM"){
+          titulo = c("សីតុណ្ហភាព")
         } else if (input$idioma == "ENG"){
           titulo = c("Temperature")
         }
@@ -456,8 +513,8 @@ server <- function(input, output, session) {
       
       output$humedad <- renderInfoBox({
         
-        if (input$idioma == "ESP"){
-          titulo = c("Humedad")
+        if (input$idioma == "CAM"){
+          titulo = c("សំណើម")
         } else if (input$idioma == "ENG"){
           titulo = c("Humidity")
         }
@@ -501,13 +558,20 @@ server <- function(input, output, session) {
       
       
       output$Batery<- renderInfoBox({
+        
+        if (input$idioma == "CAM"){
+          titulo = c("ស្គរ")
+        } else if (input$idioma == "ENG"){
+          titulo = c("Battery")
+        }
+        
         infoBox(
-          "Batería", value_Bat, icon = icon("battery-3", lib = "font-awesome"),
+          titulo, value_Bat, icon = icon("battery-3", lib = "font-awesome"),
           color = "orange", fill = TRUE)
       })
-    #___________________________________________
       
-    #Render InfoBoxes_________________________________________________________
+      
+    #Render InfoBoxes
       
       output$InfoBoxes <- renderUI({
         
@@ -532,14 +596,27 @@ server <- function(input, output, session) {
       
       output$InfoBoxes_adicionales <- renderUI({
         
+        if (input$idioma == "CAM"){
+          validate(
+            need(input$dates, "សូមអភ័យទោស ប៉ុន្តែអ្នកមិនបានជ្រើសរើសកាលបរិច្ឆេទណាមួយទេ។
+                      សូមជ្រើសរើសយ៉ាងហោចណាស់មួយ។"
+            ))
+        } else if (input$idioma == "ENG"){
+          validate(
+            need(input$dates, "Sorry, but you have not selected any dates 
+                      Please select at least one."
+            ))
+        }
+        
+        
         aux <- data %>%
           filter(
             Date >= as.POSIXct(input$dates[1]),
             Date <= as.POSIXct(input$dates[2]),
             ID %in% as.integer(input$id)) %>%
           select(CO2)%>%
-          filter(CO2 >= 700) %>%
-          summarise(n = (n()/4))
+          filter(CO2 >= umbral) %>%
+          summarise(n = (n()/n_barras))
         
         days <- data %>%
           filter(
@@ -550,10 +627,10 @@ server <- function(input, output, session) {
           summarise(Date = unique(Date)) %>%
           summarise(n = n())
         
-        if(input$idioma == "ESP"){
-          titulos = c("Huella de carbono", "Recursos")
-          valor_huella = HTML(paste("Tu valor: ",aux*0.0032, "toneladas de CO2", br(), "Recomendado: ", days*0.0046, "toneladas de CO2"))
-          valor_recursos = HTML("Recursos quemados: ",paste(aux*2, "Kg"))
+        if(input$idioma == "CAM"){
+          titulos = c("ដានកាបូន", "មធ្យោបាយ")
+          valor_huella = HTML(paste("តម្លៃរបស់អ្នក៖ ",aux*0.0032, "តោន CO2", br(), "បានណែនាំ: ", days*0.0046, "តោន CO2"))
+          valor_recursos = HTML("ធនធានត្រូវបានដុតបំផ្លាញ៖ ",paste(aux*2, "Kg"))
         } else if(input$idioma == "ENG"){
           titulos = c("Carbon footprint", "Resources")
           valor_huella = HTML(paste("Your value: ",aux*0.0032, "tonnes CO2", br(),"Recommended: ", days*0.0046, "t CO2" ))
@@ -577,10 +654,10 @@ server <- function(input, output, session) {
   
   output$boton_id_resumen <- renderUI({
     
-    if (input$idioma == "ESP"){
-        label = "Selecciona el aparato que quieras visualizar"
-        choices = c("Aparato 1" = "1","Aparato 2" = "2","Aparato 3" = "3",
-                    "Aparato 4" = "4","Aparato 5" = "5")
+    if (input$idioma == "CAM"){
+        label = "ជ្រើសរើសឧបករណ៍ដែលអ្នកចង់មើល"
+        choices = c("ឧបករណ៍ 1" = "1","ឧបករណ៍ 2" = "2","ឧបករណ៍ 3" = "3",
+                    "ឧបករណ៍ 4" = "4","ឧបករណ៍ 5" = "5")
       } else if (input$idioma == "ENG"){
           label = "Select the device you want to display"
           choices = c("Device 1" = "1","Device 2" = "2","Device 3" = "3",
@@ -600,8 +677,8 @@ server <- function(input, output, session) {
   
   output$boton_variable <- renderUI({
     
-    if (input$idioma == "ESP"){
-      choices = c("Temperatura" = "Tem","Humedad" = "Hum", "CO2", "CO",
+    if (input$idioma == "CAM"){
+      choices = c("សីតុណ្ហភាព" = "Tem","សំណើម" = "Hum", "CO2", "CO",
                   "PM 1.0" = "PM1", "PM 2.5" = "PM2", "PM 10"="PM10", "Batería" = "Bat")
     } else if (input$idioma == "ENG"){
       choices = c("Temperature" = "Tem","Humidity" = "Hum", "CO2", "CO",
@@ -623,8 +700,8 @@ server <- function(input, output, session) {
   output$boton_fechas <- renderUI({
     
     
-    if (input$idioma == "ESP"){
-      label = "Selecciona dos fechas:"
+    if (input$idioma == "CAM"){
+      label = "ជ្រើសរើសកាលបរិច្ឆេទពីរ"
     } else if(input$idioma == "ENG"){
       label = "Select two dates:"
     }
@@ -665,19 +742,17 @@ server <- function(input, output, session) {
   
   output$boton_coordenadas <- renderUI({
     
-    if (input$idioma == "ESP"){
-      actionBttn(
-        inputId = "cambio_mapa",
-        label = "Coordenadas",
-        style = "pill", 
-        color = "warning"
-      )} else if (input$idioma == "ENG"){
-        actionBttn(
-          inputId = "cambio_mapa",
-          label = "Coordinates",
-          style = "pill", 
-          color = "warning"
-        )}
+    if (input$idioma == "CAM"){
+        label = "កូអរដោនេ"
+      } else if (input$idioma == "ENG"){
+        label = "Coordinates"
+  }
+    
+    actionBttn(
+      inputId = "cambio_mapa",
+      label = label,
+      style = "pill", 
+      color = "warning")
   })
   #____________________________________________________________________________
   
@@ -686,7 +761,7 @@ server <- function(input, output, session) {
   
   output$InfoBoxes <- renderUI({
     
-    if(input$idioma == "ESP"){
+    if(input$idioma == "CAM"){
       titulos = c("Temperatura", "Humedad", "Batería")
     } else if(input$idioma == "ENG"){
       titulos = c("Temperature", "Humidity", "Battery")
@@ -742,8 +817,8 @@ server <- function(input, output, session) {
     
     output$mapa_interactivo <- renderLeaflet({
       
-      if (input$idioma == "ESP"){
-        label = paste0("Aparato ", coords$ID)
+      if (input$idioma == "CAM"){
+        label = paste0("ឧបករណ៍ ", coords$ID)
         } else if (input$idioma == "ENG"){
           label = paste0("Device ", coords$ID)
           }
@@ -765,8 +840,8 @@ server <- function(input, output, session) {
   
   output$mapa_interactivo <- renderLeaflet({
     
-    if (input$idioma == "ESP"){
-      label = paste0("Aparato ", coords$ID)
+    if (input$idioma == "CAM"){
+      label = paste0("ឧបករណ៍ ", coords$ID)
     } else if (input$idioma == "ENG"){
       label = paste0("Device ", coords$ID)
     }
@@ -803,20 +878,20 @@ server <- function(input, output, session) {
   
   
     #Apartado de modifiacion de coordenadas____________________________________
-    # Create object to store reactive values
+    # Crear objeto para guardar los valores reacctivos
     vals <- reactiveValues(
       txt = NULL,
       error_msg = NULL,
       print = FALSE
     )
     
-    # Create modal
+    # Crear modal
     popupModal <- function() {
       
-      if(input$idioma == "ESP"){
-        titulos = c("Modifique las coordenadas de los aparatos", "Aparato 1", 
-                    "Aparato 2", "Aparato 3", "Aparato 4", "Aparato 5", 
-                    "Selecciona la longitud", "Seleccione la latitud", "Cancelar")
+      if(input$idioma == "CAM"){
+        titulos = c("កែប្រែ", "ឧបករណ៍ 1", 
+                    "ឧបករណ៍ 2", "ឧបករណ៍ 3", "ឧបករណ៍ 4", "ឧបករណ៍ 5", 
+                    "ជ្រើសរើសប្រវែង", "ជ្រើសរើសរយៈទទឹង", "បោះបង់")
       }else if(input$idioma == "ENG"){
         titulos = c("Modify the device coordinates", "Device 1", 
                     "Device 2", "Device 3", "Device 4", "Device 5", 
@@ -827,14 +902,14 @@ server <- function(input, output, session) {
         title = tags$h3(titulos[1]),
         fluidRow(column(12), tags$h4(titulos[2])),
         fluidRow( column(6,
-                         #Seleccion de ID
+                         #Latitud
                          textInput(
                            inputId = "latitud1",
                            label = titulos[8],
                            value = coords$Latitud[1])
                          ),
                   
-                  #Selector de fechas
+                  #Longitud
                   column(6,
                          textInput(
                            inputId = "longitud1",
@@ -844,14 +919,13 @@ server <- function(input, output, session) {
                   ),
         fluidRow(column(12), tags$h4(titulos[3])),
         fluidRow(column(6,
-                         #Seleccion de ID
+                         #Latitud
                          textInput(
                            inputId = "latitud2",
                            label = titulos[8],
                            value = coords$Latitud[2])
                          ),
-                  
-                  #Selector de fechas
+                  #Longitud
                   column(6,
                          textInput(
                            inputId = "longitud2",
@@ -861,14 +935,14 @@ server <- function(input, output, session) {
                   ),
         fluidRow(column(12), tags$h4(titulos[4])),
         fluidRow(column(6,
-                         #Seleccion de ID
+                         #Latitud
                          textInput(
                            inputId = "latitud3",
                            label = titulos[8],
                            value = coords$Latitud[3]
                          )),
                   
-                  #Selector de fechas
+                  #Longitud
                   column(6,
                          textInput(
                            inputId = "longitud3",
@@ -878,14 +952,14 @@ server <- function(input, output, session) {
                   ),
         fluidRow(column(12), tags$h4(titulos[5])),
         fluidRow(column(6,
-                         #Seleccion de ID
+                         #Latitud
                          textInput(
                            inputId = "latitud4",
                            label = titulos[8],
                             value = coords$Latitud[4]
                          )),
                   
-                  #Selector de fechas
+                  #Longitud
                   column(6,
                          textInput(
                            inputId = "longitud4",
@@ -895,14 +969,14 @@ server <- function(input, output, session) {
                   ),
         fluidRow(column(12), tags$h4(titulos[6])),
         fluidRow( column(6,
-                         #Seleccion de ID
+                         #Latitud
                          textInput(
                            inputId = "latitud5",
                            label = titulos[8],
                            value = coords$Latitud[5]
                          )),
                   
-                  #Selector de fechas
+                  #Longitud
                   column(6,
                          textInput(
                            inputId = "longitud5",
