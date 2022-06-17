@@ -177,6 +177,17 @@ server <- function(input, output, session) {
              សូមជ្រើសរើសយ៉ាងហោចណាស់មួយ។"
         )
       )
+      validate(
+        need(input$dates, "យើង·សុំទោស,ប៉ុន្តែអ្នកមិនបានជ្រើសរើសកាលបរិច្ឆេទណាមួយទេ។
+             សូមជ្រើសរើសកាលបរិច្ឆេទពីរ។"
+        )
+      )
+      
+      validate(
+        need(input$dates[2] > input$dates[1],  "យើង·សុំទោស,ប៉ុន្តែអ្នកមិនបានជ្រើសរើសកាលបរិច្ឆេទណាមួយទេ។
+             សូមជ្រើសរើសកាលបរិច្ឆេទពីរ។"
+        ))
+      lab_x = "កាលបរិច្ឆេទ"
       
     } else if (input$idioma == "ENG"){
       validate(
@@ -184,24 +195,21 @@ server <- function(input, output, session) {
                       Please select at least one."
         )
       )
-    }
-    
-    if (input$idioma == "CAM"){
-      validate(
-        need(input$dates, "យើង·សុំទោស,ប៉ុន្តែអ្នកមិនបានជ្រើសរើសកាលបរិច្ឆេទណាមួយទេ។
-             សូមជ្រើសរើសកាលបរិច្ឆេទពីរ។"
-        )
-      )
-      lab_x = "កាលបរិច្ឆេទ"
       
-    } else if (input$idioma == "ENG"){
       validate(
         need(input$dates, "Sorry, there is no dates for you requested combination. 
                       Please add an input selection"
         )
       )
+      
+      validate(
+        need(input$dates[2] > input$dates[1], "Sorry, there is no dates for you requested combination. 
+                      Please modify the input selection"
+        )
+      )
       lab_x = "Date"
     }
+    
     
     #Grafico
     data %>%
@@ -266,27 +274,36 @@ server <- function(input, output, session) {
           )
         )
         
+        validate(
+          need(input$dates, "យើង·សុំទោស,ប៉ុន្តែអ្នកមិនបានជ្រើសរើសកាលបរិច្ឆេទណាមួយទេ។
+             សូមជ្រើសរើសកាលបរិច្ឆេទពីរ។"
+          )
+        )
+        
+        validate(
+          need(input$dates[2] > input$dates[1],  "យើង·សុំទោស,ប៉ុន្តែអ្នកមិនបានជ្រើសរើសកាលបរិច្ឆេទណាមួយទេ។
+             សូមជ្រើសរើសកាលបរិច្ឆេទពីរ។"
+          ))
+        
+        lab_x = "កាលបរិច្ឆេទ"
+        
       } else if (input$idioma == "ENG"){
         validate(
           need(input$id, "Sorry, but you have not selected any device. 
                       Please select at least one."
           )
         )
-      }
-      
-      if (input$idioma == "CAM"){
-        validate(
-          need(input$dates, "យើង·សុំទោស,ប៉ុន្តែអ្នកមិនបានជ្រើសរើសកាលបរិច្ឆេទណាមួយទេ។
-             សូមជ្រើសរើសកាលបរិច្ឆេទពីរ។"
-          )
-        )
-        lab_x = "កាលបរិច្ឆេទ"
         
-      } else if (input$idioma == "ENG"){
         validate(
           need(input$dates, "Sorry, but you have not selected any dates 
                       Please select two dates."
           ))
+        
+        validate(
+          need(input$dates[2] > input$dates[1], "Sorry, there is no dates for you requested combination. 
+                      Please modify the input selection"
+          ))
+        
         lab_x = "Date"
       }
       
@@ -402,15 +419,23 @@ server <- function(input, output, session) {
         validate(
           need(input$dates, "យើងសុំទោស ប៉ុន្តែអ្នកមិនបានជ្រើសរើសកាលបរិច្ឆេទណាមួយទេ។
                សូមជ្រើសរើសកាលបរិច្ឆេទពីរ។"
-          )
-        )
+          ))
+        
+        validate(
+          need(input$dates[2] > input$dates[1],  "យើងសុំទោស ប៉ុន្តែអ្នកមិនបានជ្រើសរើសកាលបរិច្ឆេទណាមួយទេ។
+               សូមជ្រើសរើសកាលបរិច្ឆេទពីរ។"
+          ))
         
       } else if (input$idioma == "ENG"){
         validate(
           need(input$dates, "Sorry, there is no dates for you requested combination. 
                       Please add an input selection"
-          )
-        )
+          ))
+        
+        validate(
+          need(input$dates[2] > input$dates[1], "Sorry, there is no dates for you requested combination. 
+                      Please modify the input selection"
+          ))
       }
       
       
@@ -601,11 +626,21 @@ server <- function(input, output, session) {
             need(input$dates, "សូមអភ័យទោស ប៉ុន្តែអ្នកមិនបានជ្រើសរើសកាលបរិច្ឆេទណាមួយទេ។
                       សូមជ្រើសរើសយ៉ាងហោចណាស់មួយ។"
             ))
+          validate(
+            need(input$dates[2] > input$dates[1],  "សូមអភ័យទោស ប៉ុន្តែអ្នកមិនបានជ្រើសរើសកាលបរិច្ឆេទណាមួយទេ។
+                      សូមជ្រើសរើសយ៉ាងហោចណាស់មួយ។"
+            ))
         } else if (input$idioma == "ENG"){
           validate(
             need(input$dates, "Sorry, but you have not selected any dates 
                       Please select at least one."
             ))
+          validate(
+            need(input$dates[2] > input$dates[1], "Sorry, there is no dates for you requested combination. 
+                      Please modify the input selection"
+            ))
+          
+          
         }
         
         
